@@ -350,9 +350,11 @@ gwt() {
     case "$1" in
         add|move|mv|cd)
             # パスが返された場合はディレクトリを移動
-            if [[ -n "$result" ]] && [[ -d "$result" ]]; then
-                echo "Moving to worktree: $result" >&2
-                builtin cd "$result"
+            # 結果の最後の行（パス）を取得
+            local path="${result##*$'\n'}"
+            if [[ -n "$path" ]] && [[ -d "$path" ]]; then
+                echo "Moving to worktree: $path" >&2
+                builtin cd "$path"
             else
                 echo "$result"
             fi
