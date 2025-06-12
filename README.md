@@ -1,6 +1,6 @@
 # gwt.zsh
 
-効率的にGit Worktreeを管理するためのzshプラグイン
+🌳 効率的にGit Worktreeを管理するためのzshプラグイン
 
 ## 概要
 
@@ -12,19 +12,19 @@ Worktreeの作成・削除・移動を簡単に行えるzshプラグインです
 ### zinit
 
 ```zsh
-zinit light arrow2nd/gwt
+zinit light arrow2nd/gwt.zsh
 ```
 
 ### oh-my-zsh
 
 ```bash
-git clone https://github.com/arrow2nd/gwt $ZSH_CUSTOM/plugins/gwt
+git clone https://github.com/arrow2nd/gwt $ZSH_CUSTOM/plugins/gwt.zsh
 ```
 
 `.zshrc`に追加:
 
 ```zsh
-plugins=(... gwt)
+plugins=(... gwt.zsh)
 ```
 
 ## 使い方
@@ -71,4 +71,4 @@ $GWT_ROOT_DIR/.gwt/<project_name>/<branch_name>/
 
 - git
 - zsh
-- fzf（対話的選択用）
+- fzf
