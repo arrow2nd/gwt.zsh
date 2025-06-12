@@ -18,7 +18,7 @@ zinit light arrow2nd/gwt.zsh
 ### oh-my-zsh
 
 ```bash
-git clone https://github.com/arrow2nd/gwt $ZSH_CUSTOM/plugins/gwt.zsh
+git clone https://github.com/arrow2nd/gwt.zsh $ZSH_CUSTOM/plugins/gwt.zsh
 ```
 
 `.zshrc`に追加:
