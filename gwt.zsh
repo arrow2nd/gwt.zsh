@@ -3,12 +3,12 @@
 
 # プラグインの初期化
 if [[ -z "$GWT_VERSION" ]]; then
-    export GWT_VERSION="1.2.0"
+    export GWT_VERSION="1.3.0"
 fi
 
 # デフォルト設定
-if [[ -z "$GWT_DEFAULT_ROOT" ]]; then
-    export GWT_DEFAULT_ROOT="$HOME/src"
+if [[ -z "$GWT_ROOT_DIR" ]]; then
+    export GWT_ROOT_DIR="$HOME/.gwt"
 fi
 
 # gwt関数の実装
@@ -33,8 +33,7 @@ Commands:
 If branch_name is omitted, fzf will be used for selection.
 
 Configuration:
-    GWT_ROOT_DIR     Override root directory (fallback: ghq.root config)
-    GWT_DEFAULT_ROOT Default root if neither GWT_ROOT_DIR nor ghq.root is set
+    GWT_ROOT_DIR     Root directory for storing worktrees (required)
 
 Examples:
     gwt add feature/new-api
@@ -66,23 +65,12 @@ EOF
 
     # ルートディレクトリの取得
     local get_root_dir() {
-        local root_dir
+        local root_dir="$GWT_ROOT_DIR"
 
-        # 1. GWT_ROOT_DIR環境変数をチェック
-        if [[ -n "$GWT_ROOT_DIR" ]]; then
-            root_dir="$GWT_ROOT_DIR"
-        # 2. ghq.rootの設定をチェック
-        elif root_dir=$(git config --global ghq.root 2>/dev/null) && [[ -n "$root_dir" ]]; then
-            : # 何もしない（root_dirは既に設定済み）
-        # 3. デフォルト値を使用
-        elif [[ -n "$GWT_DEFAULT_ROOT" ]]; then
-            root_dir="$GWT_DEFAULT_ROOT"
-            echo "gwt: using default root directory: $root_dir" >&2
-        else
-            error_exit "no root directory configured. Set one of:
-  export GWT_ROOT_DIR=<path>
-  git config --global ghq.root <path>
-  export GWT_DEFAULT_ROOT=<path>"
+        # GWT_ROOT_DIRが設定されていない場合はエラー
+        if [[ -z "$root_dir" ]]; then
+            error_exit "GWT_ROOT_DIR is not set. Please set it to your desired root directory:
+  export GWT_ROOT_DIR=<path>"
         fi
 
         # チルダを展開
@@ -90,25 +78,29 @@ EOF
         echo "$root_dir"
     }
 
-    # プロジェクト名を取得
+    # プロジェクト名を取得（ghq風のパス形式）
     local get_project_name() {
         local remote_url
         remote_url=$(git config --get remote.origin.url 2>/dev/null)
 
         if [[ -z "$remote_url" ]]; then
             # リモートがない場合はディレクトリ名を使用
-            basename "$(git rev-parse --show-toplevel)"
+            echo "local/$(basename "$(git rev-parse --show-toplevel)")"
             return
         fi
 
-        # GitHubやGitLabのURL形式から名前を抽出
-        if [[ "$remote_url" =~ '.*[:/]([^/]+)/([^/]+)\.git$' ]]; then
-            echo "${match[2]}"
-        elif [[ "$remote_url" =~ '.*[:/]([^/]+)/([^/]+)$' ]]; then
-            echo "${match[2]}"
+        # SSH形式: git@github.com:user/repo.git
+        if [[ "$remote_url" =~ '^git@([^:]+):([^/]+)/([^/]+)\.git$' ]]; then
+            echo "${match[1]}/${match[2]}/${match[3]}"
+        # HTTPS形式: https://github.com/user/repo.git
+        elif [[ "$remote_url" =~ '^https?://([^/]+)/([^/]+)/([^/]+)\.git$' ]]; then
+            echo "${match[1]}/${match[2]}/${match[3]}"
+        # .gitなしのHTTPS形式: https://github.com/user/repo
+        elif [[ "$remote_url" =~ '^https?://([^/]+)/([^/]+)/([^/]+)$' ]]; then
+            echo "${match[1]}/${match[2]}/${match[3]}"
         else
             # フォールバック：ディレクトリ名を使用
-            basename "$(git rev-parse --show-toplevel)"
+            echo "local/$(basename "$(git rev-parse --show-toplevel)")"
         fi
     }
 
@@ -118,7 +110,7 @@ EOF
         root_dir=$(get_root_dir)
         project_name=$(get_project_name)
 
-        echo "$root_dir/.gwt/$project_name"
+        echo "$root_dir/$project_name"
     }
 
     # 既存のブランチ一覧を取得（fzf用）

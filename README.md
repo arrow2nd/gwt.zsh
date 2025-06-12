@@ -4,8 +4,7 @@
 
 ## 概要
 
-gwtは、Git
-Worktreeの作成・削除・移動を簡単に行えるzshプラグインです。ghqのディレクトリ構造との統合やfzfを使った対話的な操作をサポートしています。
+gwtは、Git Worktreeの作成・削除・移動を簡単に行えるzshプラグインです。fzfを使った対話的な操作をサポートしています。
 
 ## インストール
 
@@ -39,6 +38,7 @@ gwt <command> [branch_name]
 - `remove [branch]` - worktreeを削除
 - `move [branch]` - worktreeディレクトリへ移動
 - `list` - 全worktreeを一覧表示
+- `prune` - リモートで削除されたブランチのworktreeを削除
 - `version` - バージョン情報を表示
 - `help` - ヘルプを表示
 
@@ -48,15 +48,19 @@ gwt <command> [branch_name]
 
 ### 環境変数
 
-- `GWT_ROOT_DIR` - ルートディレクトリ（最優先）
-- `GWT_DEFAULT_ROOT` - デフォルトルート（デフォルト: `$HOME/src`）
+- `GWT_ROOT_DIR` - worktreeを格納するルートディレクトリ（必須、デフォルト: `$HOME/.gwt`）
 
 ### ディレクトリ構造
 
 worktreeは以下の構造で作成されます:
 
 ```
-$GWT_ROOT_DIR/.gwt/<project_name>/<branch_name>/
+$GWT_ROOT_DIR/<service>/<user>/<repo>/<branch_name>/
+```
+
+例:
+```
+$GWT_ROOT_DIR/github.com/arrow2nd/gwt.zsh/feature-branch/
 ```
 
 ## 必要な環境
