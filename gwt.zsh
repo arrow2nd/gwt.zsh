@@ -3,7 +3,7 @@
 
 # プラグインの初期化
 if [[ -z "$GWT_VERSION" ]]; then
-    export GWT_VERSION="1.0.0"
+    export GWT_VERSION="1.0.1"
 fi
 
 # デフォルト設定
@@ -221,17 +221,25 @@ EOF
     # worktreeディレクトリに移動
     local gwt_move() {
         local branch="$1"
-        local base_dir worktree_dir
+        local worktree_dir
 
         if [[ -z "$branch" ]]; then
             branch=$(select_branch_with_fzf "move")
             [[ -z "$branch" ]] && error_exit "no branch selected"
         fi
 
-        base_dir=$(get_worktree_base)
-        worktree_dir="$base_dir/$branch"
+        # git worktree listから実際のパスを取得
+        worktree_dir=$(git worktree list --porcelain | awk -v branch="$branch" '
+            /^worktree/ { path = $2 }
+            /^branch/ && $2 == "refs/heads/" branch { print path; exit }
+        ')
 
-        # worktreeディレクトリが存在するかチェック
+        # worktreeディレクトリが見つからない場合
+        if [[ -z "$worktree_dir" ]]; then
+            error_exit "worktree not found for branch: $branch"
+        fi
+
+        # ディレクトリが存在するかチェック
         if [[ ! -d "$worktree_dir" ]]; then
             error_exit "worktree directory not found: $worktree_dir"
         fi
