@@ -3,7 +3,7 @@
 
 # プラグインの初期化
 if [[ -z "$GWT_VERSION" ]]; then
-    export GWT_VERSION="1.0.1"
+    export GWT_VERSION="1.2.0"
 fi
 
 # デフォルト設定
@@ -26,6 +26,7 @@ Commands:
     remove [branch]  Remove the specified worktree
     move [branch]    Move to the specified worktree directory
     list             List all worktrees
+    prune            Remove worktrees for deleted remote branches
     version          Show version information
     help             Show this help
 
@@ -290,6 +291,77 @@ EOF
         echo "Git Worktree Manager for zsh"
     }
 
+    # リモートで削除されたブランチのworktreeを削除
+    local gwt_prune() {
+        local base_dir
+        base_dir=$(get_worktree_base)
+
+        echo "Fetching remote changes and pruning..." >&2
+        git fetch --prune
+
+        # 削除されたリモートブランチを取得
+        local deleted_branches=()
+        local worktree_branches
+        worktree_branches=$(git worktree list --porcelain | awk '/^branch/ {gsub(/^refs\/heads\//, "", $2); print $2}' | grep -v '^$')
+
+        # 各worktreeブランチをチェック
+        local removed_count=0
+        while IFS= read -r branch; do
+            # mainやmasterは除外
+            if [[ "$branch" == "main" ]] || [[ "$branch" == "master" ]]; then
+                continue
+            fi
+
+            # リモートブランチが存在するかチェック
+            if ! git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+                # ローカルブランチがリモート追跡ブランチを持っていたかチェック
+                local tracking_branch
+                tracking_branch=$(git for-each-ref --format='%(upstream:short)' "refs/heads/$branch" 2>/dev/null)
+
+                if [[ -n "$tracking_branch" ]]; then
+                    echo "Found orphaned worktree: $branch (remote branch deleted)" >&2
+                    deleted_branches+=("$branch")
+                fi
+            fi
+        done <<< "$worktree_branches"
+
+        # 削除確認
+        if [[ ${#deleted_branches[@]} -eq 0 ]]; then
+            echo "✓ No orphaned worktrees found" >&2
+            return 0
+        fi
+
+        echo "" >&2
+        echo "The following worktrees will be removed:" >&2
+        for branch in "${deleted_branches[@]}"; do
+            echo "  - $branch" >&2
+        done
+        echo "" >&2
+
+        # 確認プロンプト
+        echo -n "Proceed with removal? [y/N] " >&2
+        local response
+        read -r response
+
+        if [[ "$response" != "y" ]] && [[ "$response" != "Y" ]]; then
+            echo "Cancelled" >&2
+            return 0
+        fi
+
+        # worktreeを削除
+        for branch in "${deleted_branches[@]}"; do
+            local worktree_dir="$base_dir/$branch"
+            if [[ -d "$worktree_dir" ]]; then
+                echo "Removing worktree: $branch" >&2
+                git worktree remove "$worktree_dir"
+                ((removed_count++))
+            fi
+        done
+
+        echo "" >&2
+        echo "✓ Removed $removed_count worktree(s)" >&2
+    }
+
     # メイン処理
     check_dependencies
     check_git_repo
@@ -309,6 +381,9 @@ EOF
             ;;
         list|ls)
             gwt_list
+            ;;
+        prune)
+            gwt_prune
             ;;
         version|--version|-v)
             gwt_version
@@ -342,6 +417,7 @@ _gwt() {
                 'remove:Remove a worktree'
                 'move:Move to worktree directory'
                 'list:List all worktrees'
+                'prune:Remove worktrees for deleted remote branches'
                 'version:Show version information'
                 'help:Show help'
             )
