@@ -179,7 +179,7 @@ EOF
         mkdir -p "$base_dir"
 
         # worktreeを作成
-        echo "Creating worktree for branch '$branch'..."
+        echo "Creating worktree for branch '$branch'..." >&2
         if git show-ref --verify --quiet "refs/heads/$branch"; then
             # ローカルブランチが存在する場合
             git worktree add "$worktree_dir" "$branch"
@@ -191,7 +191,7 @@ EOF
             git worktree add "$worktree_dir" -b "$branch"
         fi
 
-        echo "✓ Worktree created: $worktree_dir"
+        echo "✓ Worktree created: $worktree_dir" >&2
         echo "$worktree_dir"
     }
 
@@ -213,9 +213,9 @@ EOF
             error_exit "worktree not found: $worktree_dir"
         fi
 
-        echo "Removing worktree for branch '$branch'..."
+        echo "Removing worktree for branch '$branch'..." >&2
         git worktree remove "$worktree_dir"
-        echo "✓ Worktree removed: $worktree_dir"
+        echo "✓ Worktree removed: $worktree_dir" >&2
     }
 
     # worktreeディレクトリに移動
@@ -351,7 +351,7 @@ gwt() {
         add|move|mv|cd)
             # パスが返された場合はディレクトリを移動
             if [[ -n "$result" ]] && [[ -d "$result" ]]; then
-                echo "Moving to worktree: $result"
+                echo "Moving to worktree: $result" >&2
                 builtin cd "$result"
             else
                 echo "$result"
