@@ -44,20 +44,12 @@ gwt <command> [branch_name]
 
 ブランチ名を省略するとfzfで選択できます。
 
-### エイリアス
-
-- `gwa` - `gwt add`
-- `gwr` - `gwt remove`
-- `gwm` - `gwt move`
-- `gwl` - `gwt list`
-
 ## 設定
 
 ### 環境変数
 
 - `GWT_ROOT_DIR` - ルートディレクトリ（最優先）
 - `GWT_DEFAULT_ROOT` - デフォルトルート（デフォルト: `$HOME/src`）
-- `GWT_NO_ALIASES` - エイリアスを無効化
 
 ### ディレクトリ構造
 

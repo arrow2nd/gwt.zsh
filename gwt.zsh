@@ -22,7 +22,7 @@ gwt() {
 Usage: gwt <command> [branch_name]
 
 Commands:
-    add [branch]     Create a new worktree for the specified branch
+    add [branch]     Create a new worktree and move to it
     remove [branch]  Remove the specified worktree
     move [branch]    Move to the specified worktree directory
     list             List all worktrees
@@ -192,6 +192,8 @@ EOF
         fi
 
         echo "✓ Worktree created: $worktree_dir"
+        echo "Moving to worktree: $worktree_dir"
+        cd "$worktree_dir"
     }
 
     # worktreeを削除
@@ -338,13 +340,6 @@ _gwt() {
 # 補完関数を登録
 compdef _gwt gwt
 
-# エイリアスの設定（オプション）
-if [[ -z "$GWT_NO_ALIASES" ]]; then
-    alias gwa='gwt add'
-    alias gwr='gwt remove'
-    alias gwm='gwt move'
-    alias gwl='gwt list'
-fi
 
 # プラグイン読み込み完了メッセージ（デバッグ用、本番では無効化）
 if [[ -n "$GWT_DEBUG" ]]; then
