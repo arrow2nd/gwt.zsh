@@ -192,7 +192,8 @@ EOF
         fi
 
         echo "✓ Worktree created: $worktree_dir" >&2
-        echo "$worktree_dir"
+        echo "Moving to worktree: $worktree_dir" >&2
+        builtin cd "$worktree_dir"
     }
 
     # worktreeを削除
@@ -236,7 +237,8 @@ EOF
             error_exit "worktree directory not found: $worktree_dir"
         fi
 
-        echo "$worktree_dir"
+        echo "Moving to worktree: $worktree_dir" >&2
+        builtin cd "$worktree_dir"
     }
 
     # worktree一覧を表示
@@ -340,28 +342,14 @@ gwt() {
     local result
     result=$(_gwt_internal "$@")
     local exit_code=$?
-    
+
     # エラーが発生した場合はそのまま終了
     if [[ $exit_code -ne 0 ]]; then
         return $exit_code
     fi
-    
-    # コマンドに応じて処理を分岐
-    case "$1" in
-        add|move|mv|cd)
-            # パスが返された場合はディレクトリを移動
-            if [[ -n "$result" ]] && [[ -d "$result" ]]; then
-                echo "Moving to worktree: $result" >&2
-                builtin cd "$result"
-            else
-                echo "$result"
-            fi
-            ;;
-        *)
-            # その他のコマンドは結果をそのまま表示
-            [[ -n "$result" ]] && echo "$result"
-            ;;
-    esac
+
+    # 結果を表示
+    [[ -n "$result" ]] && echo "$result"
 }
 
 # 補完関数を登録
