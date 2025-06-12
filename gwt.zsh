@@ -198,7 +198,7 @@ EOF
     # worktreeを削除
     local gwt_remove() {
         local branch="$1"
-        local base_dir worktree_dir
+        local base_dir worktree_dir current_dir need_move=false
 
         if [[ -z "$branch" ]]; then
             branch=$(select_branch_with_fzf "remove")
@@ -213,9 +213,35 @@ EOF
             error_exit "worktree not found: $worktree_dir"
         fi
 
+        # 現在のディレクトリを取得
+        current_dir="$(pwd)"
+
+        # 削除対象のworktreeにいる場合
+        if [[ "$current_dir" == "$worktree_dir" ]]; then
+            need_move=true
+            # デフォルトブランチ（main または master）のパスを取得
+            local default_branch_dir
+            default_branch_dir=$(git worktree list --porcelain | awk '
+                /^worktree/ { path = $2 }
+                /^branch/ && ($2 == "refs/heads/main" || $2 == "refs/heads/master") { print path; exit }
+            ')
+
+            if [[ -n "$default_branch_dir" ]] && [[ -d "$default_branch_dir" ]]; then
+                echo "Moving to default branch before removing current worktree..." >&2
+                echo "$default_branch_dir"
+            else
+                error_exit "cannot remove current worktree: no default branch found to switch to"
+            fi
+        fi
+
         echo "Removing worktree for branch '$branch'..." >&2
         git worktree remove "$worktree_dir"
         echo "✓ Worktree removed: $worktree_dir" >&2
+
+        # need_moveがtrueの場合、呼び出し元でディレクトリ移動を行うためパスを返す
+        if [[ "$need_move" == true ]]; then
+            echo "$default_branch_dir"
+        fi
     }
 
     # worktreeディレクトリに移動
@@ -348,15 +374,15 @@ gwt() {
     local result
     result=$(_gwt_internal "$@")
     local exit_code=$?
-    
+
     # エラーが発生した場合はそのまま終了
     if [[ $exit_code -ne 0 ]]; then
         return $exit_code
     fi
-    
+
     # コマンドに応じて処理を分岐
     case "$1" in
-        add|move|mv|cd)
+        add|move|mv|cd|remove|rm)
             # パスが返された場合はディレクトリを移動
             # 結果の最後の行（パス）を取得
             local path="${result##*$'\n'}"
