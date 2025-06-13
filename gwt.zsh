@@ -3,7 +3,7 @@
 
 # プラグインの初期化
 if [[ -z "$GWT_VERSION" ]]; then
-    export GWT_VERSION="1.3.0"
+    export GWT_VERSION="1.4.0"
 fi
 
 # デフォルト設定
