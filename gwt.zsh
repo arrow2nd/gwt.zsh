@@ -3,7 +3,7 @@
 
 # プラグインの初期化
 if [[ -z "$GWT_VERSION" ]]; then
-    export GWT_VERSION="1.3.0"
+    export GWT_VERSION="1.4.0"
 fi
 
 # デフォルト設定
@@ -159,7 +159,10 @@ EOF
             error_exit "no branches found"
         fi
 
-        echo "$branches" | fzf --prompt="Select branch to $prompt: " --height=40% --border
+        local selected
+        selected=$(echo "$branches" | fzf --prompt="Select branch to $prompt: " --height=40% --border)
+
+        echo "$selected"
     }
 
     # worktreeを追加
@@ -267,7 +270,16 @@ EOF
 
         # worktreeディレクトリが見つからない場合
         if [[ -z "$worktree_dir" ]]; then
-            error_exit "worktree not found for branch: $branch"
+            # worktreeが存在しない場合、ブランチが存在するかチェック
+            if git show-ref --verify --quiet "refs/heads/$branch" || git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+                # ブランチが存在する場合はgit switchでブランチ切り替え
+                echo "Worktree not found for branch '$branch'. Switching to branch instead..." >&2
+                git switch "$branch"
+                echo "$(pwd)"
+                return 0
+            else
+                error_exit "branch '$branch' does not exist"
+            fi
         fi
 
         # ディレクトリが存在するかチェック
@@ -434,12 +446,12 @@ _gwt() {
             fi
 
             case $line[1] in
-                add)
+                add|move|mv|cd)
                     # 全ブランチ（リモート含む）
                     local branches=($(git branch -a --format="%(refname:short)" 2>/dev/null | grep -v '^HEAD' | sed 's|^origin/||' | sort -u))
                     _describe 'branches' branches
                     ;;
-                remove|rm|move|mv|cd)
+                remove|rm)
                     # 既存のworktreeのブランチのみ
                     local worktree_branches=($(git worktree list --porcelain 2>/dev/null | awk '/^branch/ {gsub(/^refs\/heads\//, "", $2); print $2}' | grep -v '^$'))
                     _describe 'worktree branches' worktree_branches
