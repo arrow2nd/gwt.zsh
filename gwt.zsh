@@ -115,10 +115,20 @@ EOF
 
     # 既存のブランチ一覧を取得（fzf用）
     local get_branches_for_fzf() {
-        git branch -a --format="%(refname:short)" | \
-            grep -v '^HEAD' | \
-            sed 's|^origin/||' | \
-            sort -u
+        local local_only="$1"
+
+        if [[ "$local_only" == "true" ]]; then
+            # ローカルブランチのみ
+            git branch -l --format="%(refname:short)" | \
+                grep -v '^HEAD' | \
+                sort -u
+        else
+            # 全ブランチ（リモート含む）
+            git branch -a --format="%(refname:short)" | \
+                grep -v '^HEAD' | \
+                sed 's|^origin/||' | \
+                sort -u
+        fi
     }
 
     # 既存のworktree一覧を取得（fzf用）
@@ -137,8 +147,10 @@ EOF
             error_exit "fzf is required for interactive selection"
         fi
 
-        if [[ "$prompt" == "remove" || "$prompt" == "move" ]]; then
+        if [[ "$prompt" == "remove" ]]; then
             branches=$(get_worktrees_for_fzf)
+        elif [[ "$prompt" == "move" ]]; then
+            branches=$(get_branches_for_fzf "true")
         else
             branches=$(get_branches_for_fzf)
         fi
