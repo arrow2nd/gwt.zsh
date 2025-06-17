@@ -356,7 +356,6 @@ EOF
             local reason=""
 
             # 1. ブランチがマージ済みかチェック
-            # 1. ブランチがマージ済みかチェック
             if echo "$merged_branches" | grep -q "^${branch}$"; then
                 should_remove=true
                 reason="merged into $default_branch"
