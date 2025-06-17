@@ -3,7 +3,7 @@
 
 # プラグインの初期化
 if [[ -z "$GWT_VERSION" ]]; then
-    export GWT_VERSION="1.4.0"
+    export GWT_VERSION="1.5.0"
 fi
 
 # デフォルト設定
@@ -309,11 +309,35 @@ EOF
 
     # リモートで削除されたブランチのworktreeを削除
     local gwt_prune() {
+        # この関数内ではERR_EXITを無効化
+        setopt LOCAL_OPTIONS NO_ERR_EXIT
+
         local base_dir
         base_dir=$(get_worktree_base)
 
         echo "Fetching remote changes and pruning..." >&2
         git fetch --prune
+
+        # デフォルトブランチを取得
+        local default_branch
+
+        # mainまたはmasterを優先的に使用
+        if git show-ref --verify --quiet "refs/heads/main"; then
+            default_branch="main"
+        elif git show-ref --verify --quiet "refs/heads/master"; then
+            default_branch="master"
+        else
+            # フォールバック：リモートのHEADから取得
+            default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+            if [[ -z "$default_branch" ]]; then
+                error_exit "cannot determine default branch"
+            fi
+        fi
+
+
+        # マージ済みのブランチを取得
+        local merged_branches
+        merged_branches=$(git branch --merged "$default_branch" 2>&1 | grep -v "^\*" | sed 's/^[+[:space:]]*//')
 
         # 削除されたリモートブランチを取得
         local deleted_branches=()
@@ -324,20 +348,33 @@ EOF
         local removed_count=0
         while IFS= read -r branch; do
             # mainやmasterは除外
-            if [[ "$branch" == "main" ]] || [[ "$branch" == "master" ]]; then
+            if [[ "$branch" == "main" ]] || [[ "$branch" == "master" ]] || [[ "$branch" == "$default_branch" ]]; then
                 continue
             fi
 
-            # リモートブランチが存在するかチェック
-            if ! git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
-                # ローカルブランチがリモート追跡ブランチを持っていたかチェック
+            local should_remove=false
+            local reason=""
+
+            # 1. ブランチがマージ済みかチェック
+            # 1. ブランチがマージ済みかチェック
+            if echo "$merged_branches" | grep -q "^${branch}$"; then
+                should_remove=true
+                reason="merged into $default_branch"
+            # 2. リモートブランチが存在しない場合
+            elif ! git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+                # 追跡ブランチを持っていたかチェック
                 local tracking_branch
                 tracking_branch=$(git for-each-ref --format='%(upstream:short)' "refs/heads/$branch" 2>/dev/null)
 
                 if [[ -n "$tracking_branch" ]]; then
-                    echo "Found orphaned worktree: $branch (remote branch deleted)" >&2
-                    deleted_branches+=("$branch")
+                    should_remove=true
+                    reason="remote branch deleted"
                 fi
+            fi
+
+            if [[ "$should_remove" == true ]]; then
+                echo "Found orphaned worktree: $branch ($reason)" >&2
+                deleted_branches+=("$branch")
             fi
         done <<< "$worktree_branches"
 
@@ -369,8 +406,12 @@ EOF
             local worktree_dir="$base_dir/$branch"
             if [[ -d "$worktree_dir" ]]; then
                 echo "Removing worktree: $branch" >&2
-                git worktree remove "$worktree_dir"
-                ((removed_count++))
+                # git worktree removeを実行（エラーを無視）
+                if git worktree remove "$worktree_dir" 2>&1; then
+                    ((removed_count++))
+                else
+                    echo "Failed to remove worktree: $branch" >&2
+                fi
             fi
         done
 
