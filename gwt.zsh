@@ -328,71 +328,71 @@ EOF
     # PRをチェックアウトしてworktreeを作成
     gwt_pr_checkout() {
         local pr_id="$1"
-        
+
         # PR IDが指定されていない場合
         if [[ -z "$pr_id" ]]; then
             error_exit "PR ID is required. Usage: gwt pr-checkout <PR_ID>"
             return 1
         fi
-        
+
         # PR IDが数値かチェック
         if ! [[ "$pr_id" =~ ^[0-9]+$ ]]; then
             error_exit "PR ID must be a number"
             return 1
         fi
-        
+
         # ghコマンドの存在確認
         if ! command -v gh >/dev/null 2>&1; then
             error_exit "GitHub CLI (gh) is required for pr-checkout command. Please install it from https://cli.github.com"
             return 1
         fi
-        
+
         # jqコマンドの存在確認
         if ! command -v jq >/dev/null 2>&1; then
             error_exit "jq is required for pr-checkout command. Please install it"
             return 1
         fi
-        
+
         # PR情報を取得
         echo "Fetching PR #$pr_id information..." >&2
         local pr_info
         pr_info=$(gh pr view "$pr_id" --json number,headRefName,headRepository,headRepositoryOwner 2>&1)
-        
+
         if [[ $? -ne 0 ]]; then
             error_exit "failed to fetch PR #$pr_id: $pr_info"
             return 1
         fi
-        
+
         # JSONからブランチ名を取得
         local branch
         branch=$(echo "$pr_info" | jq -r '.headRefName')
-        
+
         if [[ -z "$branch" ]] || [[ "$branch" == "null" ]]; then
             error_exit "could not determine branch name for PR #$pr_id"
             return 1
         fi
-        
+
         echo "PR #$pr_id branch: $branch" >&2
-        
+
         # worktreeのベースディレクトリとパスを構築
         local base_dir worktree_dir
         base_dir=$(get_worktree_base)
         worktree_dir="$base_dir/$branch"
-        
+
         # ディレクトリが既に存在するかチェック
         if [[ -d "$worktree_dir" ]]; then
             echo "Worktree already exists for branch '$branch', moving to it..." >&2
             echo "$worktree_dir"
             return 0
         fi
-        
+
         # ベースディレクトリを作成
         mkdir -p "$base_dir"
-        
+
         # リモートから最新情報をfetch
         echo "Fetching latest changes..." >&2
         git fetch origin
-        
+
         # worktreeを作成
         echo "Creating worktree for PR #$pr_id (branch: $branch)..." >&2
         git worktree add "$worktree_dir" -b "$branch" "origin/$branch" 2>&1 || {
@@ -403,7 +403,7 @@ EOF
             gh pr checkout "$pr_id"
             cd - > /dev/null
         }
-        
+
         echo "✓ PR #$pr_id checked out to worktree: $worktree_dir" >&2
         echo "$worktree_dir"
     }
