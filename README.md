@@ -1,4 +1,4 @@
-# gwt.zsh
+# gwt.zsh test
 
 🌳 効率的にGit Worktreeを管理するためのzshプラグイン
 
