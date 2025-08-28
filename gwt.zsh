@@ -17,7 +17,7 @@ _gwt_internal() {
     setopt LOCAL_OPTIONS ERR_EXIT
 
     # 使用方法を表示
-    local show_usage() {
+    show_usage() {
         cat << EOF
 Usage: gwt <command> [branch_name]
 
@@ -26,6 +26,7 @@ Commands:
     remove [branch]  Remove the specified worktree
     move [branch]    Move to the specified worktree directory
     list             List all worktrees
+    pr-checkout <id> Check out a pull request into a new worktree
     prune            Remove worktrees for deleted remote branches
     version          Show version information
     help             Show this help
@@ -39,32 +40,33 @@ Examples:
     gwt add feature/new-api
     gwt move
     gwt remove old-feature
+    gwt pr-checkout 123
     gwt list
 EOF
     }
 
     # エラーメッセージを表示して終了
-    local error_exit() {
+    error_exit() {
         echo "gwt: $1" >&2
         return 1
     }
 
     # 必要なコマンドの存在確認
-    local check_dependencies() {
+    check_dependencies() {
         if ! command -v git >/dev/null 2>&1; then
             error_exit "git is not installed"
         fi
     }
 
     # Gitリポジトリかどうかチェック
-    local check_git_repo() {
+    check_git_repo() {
         if ! git rev-parse --git-dir >/dev/null 2>&1; then
             error_exit "not in a git repository"
         fi
     }
 
     # ルートディレクトリの取得
-    local get_root_dir() {
+    get_root_dir() {
         local root_dir="$GWT_ROOT_DIR"
 
         # GWT_ROOT_DIRが設定されていない場合はエラー
@@ -79,7 +81,7 @@ EOF
     }
 
     # プロジェクト名を取得（ghq風のパス形式）
-    local get_project_name() {
+    get_project_name() {
         local remote_url
         remote_url=$(git config --get remote.origin.url 2>/dev/null)
 
@@ -105,7 +107,7 @@ EOF
     }
 
     # worktreeのベースディレクトリを取得
-    local get_worktree_base() {
+    get_worktree_base() {
         local root_dir project_name
         root_dir=$(get_root_dir)
         project_name=$(get_project_name)
@@ -114,7 +116,7 @@ EOF
     }
 
     # 既存のブランチ一覧を取得（fzf用）
-    local get_branches_for_fzf() {
+    get_branches_for_fzf() {
         local local_only="$1"
 
         if [[ "$local_only" == "true" ]]; then
@@ -132,19 +134,20 @@ EOF
     }
 
     # 既存のworktree一覧を取得（fzf用）
-    local get_worktrees_for_fzf() {
+    get_worktrees_for_fzf() {
         git worktree list --porcelain | \
             awk '/^branch/ {gsub(/^refs\/heads\//, "", $2); print $2}' | \
             grep -v '^$'
     }
 
     # fzfでブランチを選択
-    local select_branch_with_fzf() {
+    select_branch_with_fzf() {
         local prompt="$1"
         local branches
 
         if ! command -v fzf >/dev/null 2>&1; then
             error_exit "fzf is required for interactive selection"
+            return 1
         fi
 
         if [[ "$prompt" == "remove" ]]; then
@@ -157,6 +160,7 @@ EOF
 
         if [[ -z "$branches" ]]; then
             error_exit "no branches found"
+            return 1
         fi
 
         local selected
@@ -166,13 +170,16 @@ EOF
     }
 
     # worktreeを追加
-    local gwt_add() {
+    gwt_add() {
         local branch="$1"
         local base_dir worktree_dir
 
         if [[ -z "$branch" ]]; then
             branch=$(select_branch_with_fzf "add")
-            [[ -z "$branch" ]] && error_exit "no branch selected"
+            if [[ -z "$branch" ]]; then
+                error_exit "no branch selected"
+                return 1
+            fi
         fi
 
         base_dir=$(get_worktree_base)
@@ -181,6 +188,7 @@ EOF
         # ディレクトリが既に存在するかチェック
         if [[ -d "$worktree_dir" ]]; then
             error_exit "worktree directory already exists: $worktree_dir"
+            return 1
         fi
 
         # ベースディレクトリを作成
@@ -204,13 +212,16 @@ EOF
     }
 
     # worktreeを削除
-    local gwt_remove() {
+    gwt_remove() {
         local branch="$1"
         local base_dir worktree_dir current_dir need_move=false
 
         if [[ -z "$branch" ]]; then
             branch=$(select_branch_with_fzf "remove")
-            [[ -z "$branch" ]] && error_exit "no branch selected"
+            if [[ -z "$branch" ]]; then
+                error_exit "no branch selected"
+                return 1
+            fi
         fi
 
         base_dir=$(get_worktree_base)
@@ -219,6 +230,7 @@ EOF
         # worktreeが存在するかチェック
         if ! git worktree list | grep -q "$worktree_dir"; then
             error_exit "worktree not found: $worktree_dir"
+            return 1
         fi
 
         # 現在のディレクトリを取得
@@ -239,6 +251,7 @@ EOF
                 echo "$default_branch_dir"
             else
                 error_exit "cannot remove current worktree: no default branch found to switch to"
+                return 1
             fi
         fi
 
@@ -253,13 +266,16 @@ EOF
     }
 
     # worktreeディレクトリに移動
-    local gwt_move() {
+    gwt_move() {
         local branch="$1"
         local worktree_dir
 
         if [[ -z "$branch" ]]; then
             branch=$(select_branch_with_fzf "move")
-            [[ -z "$branch" ]] && error_exit "no branch selected"
+            if [[ -z "$branch" ]]; then
+                error_exit "no branch selected"
+                return 1
+            fi
         fi
 
         # git worktree listから実際のパスを取得
@@ -279,19 +295,21 @@ EOF
                 return 0
             else
                 error_exit "branch '$branch' does not exist"
+                return 1
             fi
         fi
 
         # ディレクトリが存在するかチェック
         if [[ ! -d "$worktree_dir" ]]; then
             error_exit "worktree directory not found: $worktree_dir"
+            return 1
         fi
 
         echo "$worktree_dir"
     }
 
     # worktree一覧を表示
-    local gwt_list() {
+    gwt_list() {
         local base_dir
         base_dir=$(get_worktree_base)
 
@@ -302,13 +320,96 @@ EOF
     }
 
     # バージョン情報を表示
-    local gwt_version() {
+    gwt_version() {
         echo "gwt version $GWT_VERSION"
         echo "Git Worktree Manager for zsh"
     }
 
+    # PRをチェックアウトしてworktreeを作成
+    gwt_pr_checkout() {
+        local pr_id="$1"
+        
+        # PR IDが指定されていない場合
+        if [[ -z "$pr_id" ]]; then
+            error_exit "PR ID is required. Usage: gwt pr-checkout <PR_ID>"
+            return 1
+        fi
+        
+        # PR IDが数値かチェック
+        if ! [[ "$pr_id" =~ ^[0-9]+$ ]]; then
+            error_exit "PR ID must be a number"
+            return 1
+        fi
+        
+        # ghコマンドの存在確認
+        if ! command -v gh >/dev/null 2>&1; then
+            error_exit "GitHub CLI (gh) is required for pr-checkout command. Please install it from https://cli.github.com"
+            return 1
+        fi
+        
+        # jqコマンドの存在確認
+        if ! command -v jq >/dev/null 2>&1; then
+            error_exit "jq is required for pr-checkout command. Please install it"
+            return 1
+        fi
+        
+        # PR情報を取得
+        echo "Fetching PR #$pr_id information..." >&2
+        local pr_info
+        pr_info=$(gh pr view "$pr_id" --json number,headRefName,headRepository,headRepositoryOwner 2>&1)
+        
+        if [[ $? -ne 0 ]]; then
+            error_exit "failed to fetch PR #$pr_id: $pr_info"
+            return 1
+        fi
+        
+        # JSONからブランチ名を取得
+        local branch
+        branch=$(echo "$pr_info" | jq -r '.headRefName')
+        
+        if [[ -z "$branch" ]] || [[ "$branch" == "null" ]]; then
+            error_exit "could not determine branch name for PR #$pr_id"
+            return 1
+        fi
+        
+        echo "PR #$pr_id branch: $branch" >&2
+        
+        # worktreeのベースディレクトリとパスを構築
+        local base_dir worktree_dir
+        base_dir=$(get_worktree_base)
+        worktree_dir="$base_dir/$branch"
+        
+        # ディレクトリが既に存在するかチェック
+        if [[ -d "$worktree_dir" ]]; then
+            echo "Worktree already exists for branch '$branch', moving to it..." >&2
+            echo "$worktree_dir"
+            return 0
+        fi
+        
+        # ベースディレクトリを作成
+        mkdir -p "$base_dir"
+        
+        # リモートから最新情報をfetch
+        echo "Fetching latest changes..." >&2
+        git fetch origin
+        
+        # worktreeを作成
+        echo "Creating worktree for PR #$pr_id (branch: $branch)..." >&2
+        git worktree add "$worktree_dir" -b "$branch" "origin/$branch" 2>&1 || {
+            # ブランチが存在しない場合は、PRから直接チェックアウト
+            echo "Branch not found in origin, checking out from PR..." >&2
+            git worktree add "$worktree_dir" -b "$branch"
+            cd "$worktree_dir"
+            gh pr checkout "$pr_id"
+            cd - > /dev/null
+        }
+        
+        echo "✓ PR #$pr_id checked out to worktree: $worktree_dir" >&2
+        echo "$worktree_dir"
+    }
+
     # リモートで削除されたブランチのworktreeを削除
-    local gwt_prune() {
+    gwt_prune() {
         # この関数内ではERR_EXITを無効化
         setopt LOCAL_OPTIONS NO_ERR_EXIT
 
@@ -331,6 +432,7 @@ EOF
             default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
             if [[ -z "$default_branch" ]]; then
                 error_exit "cannot determine default branch"
+                return 1
             fi
         fi
 
@@ -438,6 +540,9 @@ EOF
         list|ls)
             gwt_list
             ;;
+        pr-checkout)
+            gwt_pr_checkout "$branch"
+            ;;
         prune)
             gwt_prune
             ;;
@@ -452,6 +557,7 @@ EOF
             ;;
         *)
             error_exit "unknown command: $command. Use 'gwt help' for usage."
+            return 1
             ;;
     esac
 }
@@ -473,6 +579,7 @@ _gwt() {
                 'remove:Remove a worktree'
                 'move:Move to worktree directory'
                 'list:List all worktrees'
+                'pr-checkout:Check out a pull request into a new worktree'
                 'prune:Remove worktrees for deleted remote branches'
                 'version:Show version information'
                 'help:Show help'
@@ -514,7 +621,7 @@ gwt() {
 
     # コマンドに応じて処理を分岐
     case "$1" in
-        add|move|mv|cd|remove|rm)
+        add|move|mv|cd|remove|rm|pr-checkout)
             # パスが返された場合はディレクトリを移動
             # 結果の最後の行（パス）を取得
             local path="${result##*$'\n'}"

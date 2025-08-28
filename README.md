@@ -38,11 +38,12 @@ gwt <command> [branch_name]
 - `remove [branch]` - worktreeを削除
 - `move [branch]` - worktreeディレクトリへ移動
 - `list` - 全worktreeを一覧表示
+- `pr-checkout <PR_ID>` - Pull Requestをworktreeにチェックアウト（要: GitHub CLI）
 - `prune` - リモートで削除されたブランチのworktreeを削除
 - `version` - バージョン情報を表示
 - `help` - ヘルプを表示
 
-ブランチ名を省略するとfzfで選択できます。
+ブランチ名を省略するとfzfで選択できます（pr-checkoutを除く）。
 
 ## 設定
 
@@ -68,3 +69,5 @@ $GWT_ROOT_DIR/github.com/arrow2nd/gwt.zsh/feature-branch/
 - git
 - zsh
 - fzf
+- jq（pr-checkoutコマンド用）
+- GitHub CLI（pr-checkoutコマンド用、オプション）
