@@ -82,27 +82,32 @@ EOF
 
     # プロジェクト名を取得（ghq風のパス形式）
     get_project_name() {
-        local remote_url
-        remote_url=$(git config --get remote.origin.url 2>/dev/null)
+        local main_worktree remote_url
+        
+        # メインワークツリーのパスを取得（最初のワークツリーがメイン）
+        main_worktree=$(git worktree list --porcelain | awk '/^worktree/ {print $2; exit}')
+        
+        # メインワークツリーのGitディレクトリから情報を取得
+        remote_url=$(git -C "$main_worktree" config --get remote.origin.url 2>/dev/null)
 
         if [[ -z "$remote_url" ]]; then
             # リモートがない場合はディレクトリ名を使用
-            echo "local/$(basename "$(git rev-parse --show-toplevel)")"
+            echo "local/$(basename "$main_worktree")"
             return
         fi
 
         # SSH形式: git@github.com:user/repo.git
-        if [[ "$remote_url" =~ '^git@([^:]+):([^/]+)/([^/]+)\.git$' ]]; then
+        if [[ "$remote_url" =~ ^git@([^:]+):([^/]+)/([^/]+)\.git$ ]]; then
             echo "${match[1]}/${match[2]}/${match[3]}"
         # HTTPS形式: https://github.com/user/repo.git
-        elif [[ "$remote_url" =~ '^https?://([^/]+)/([^/]+)/([^/]+)\.git$' ]]; then
+        elif [[ "$remote_url" =~ ^https?://([^/]+)/([^/]+)/([^/]+)\.git$ ]]; then
             echo "${match[1]}/${match[2]}/${match[3]}"
         # .gitなしのHTTPS形式: https://github.com/user/repo
-        elif [[ "$remote_url" =~ '^https?://([^/]+)/([^/]+)/([^/]+)$' ]]; then
+        elif [[ "$remote_url" =~ ^https?://([^/]+)/([^/]+)/([^/]+)$ ]]; then
             echo "${match[1]}/${match[2]}/${match[3]}"
         else
             # フォールバック：ディレクトリ名を使用
-            echo "local/$(basename "$(git rev-parse --show-toplevel)")"
+            echo "local/$(basename "$main_worktree")"
         fi
     }
 
